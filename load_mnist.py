@@ -154,11 +154,11 @@ def run():
     # 查看前十个数据及其标签以读取是否正确
     print(train_labels[:10])
     print(train_labels.size)
-    # for i in range(10):
-    #     print(train_labels[i])
-    #     plt.imshow(train_images[i], cmap='gray')
-    #     plt.show()
-    # print('done')
+    for i in range(10):
+        print(train_labels[i])
+        plt.imshow(train_images[i], cmap='gray')
+        plt.show()
+    print('done')
 
 if __name__ == '__main__':
     run()
