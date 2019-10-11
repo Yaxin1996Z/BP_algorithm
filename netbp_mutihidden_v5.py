@@ -19,8 +19,6 @@ if __name__ == '__main__':
     # samples = [[-2, -1], [25, 6], [17, -4], [-15, 4]]
     # samples_result = np.array([[0,0],[1,1],[1,0],[0,1]])
     d, c = 28 * 28, 10
-    num_hidden = 1
-    hidden_cells = [30]
     dataset_size = 60000
     # samples = [[-2, -1], [25, 6], [17, 4], [-15, -6]]
     # samples_result = np.array([[1], [0], [0], [1]])
@@ -47,9 +45,11 @@ if __name__ == '__main__':
     if os.path.exists(os.path.abspath("net.pkl")):
         bp = BPnn.load("net.pkl")
     else:
-        bp = BPnn(d, num_hidden, hidden_cells, c)
+        bp = BPnn()
+        bp.addLayer(28*28,30)
+        bp.addLayer(30,10)
     bp.train(samples, samples_result)
-    bp.save('net.pkl')
+    bp.save('./net_trained/net.pkl')
 
     # testsamples = samples[3]
     # bp.test(testsamples)  # 输出应该是1,0

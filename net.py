@@ -20,16 +20,15 @@ def deriv_sigmoid(x):
     fx = sigmoid(x)
     return fx*(1-fx)
 
+
 class Layer:
     # 初始化神经网络层 初始化参数：输入节点数，输出节点数，权重矩阵，偏置向量
-    def __init__(self,input_size=0,output_size=0):
-        self.input_size = input_size
-        self.output_size = output_size
-        self.weights = np.random.normal(0, 0.1, (output_size,input_size))
-        self.bias = np.ones((output_size))
-    def initWeights(self,input_size,output_size):
-        self.weights = np.random.normal(0, 0.1, (output_size, input_size))
-        self.bias = np.ones((output_size))
+    def __init__(self,n_in,n_out):
+        self.n_in = n_in
+        self.n_out = n_out
+        self.weights = np.random.normal(0, 0.1, (n_out,n_in))
+        self.bias = np.ones((n_out))
+
     # 该层前向传播 得到总输出向量
     def feedforward(self,inputs):
         net = np.dot(self.weights,inputs) + self.bias  # inputs和weight一个行向量一个列向量
@@ -38,46 +37,35 @@ class Layer:
 
     # input假设有d个单元 用i计数 该层输出是n个 用j计数 该层后面一层是c个
     # 要更新的权矩阵为n*h  后面层w_next的权矩阵为c*n  后面层的delt有c个 每一行有c个
-    def update_weights_return_delt(self,inputs,delts,w_next, nets):
-        num_in = np.size(inputs[0])
-        num_out = np.size(nets[0])
-        batch_size = np.size(nets[:,0])
+    def update_weights_return_delt(self, inputs, delts, w_next, nets):
         delt_pre = np.dot(delts,w_next)*deriv_sigmoid(nets)
-        for j in range(num_out):
-            for i in range(num_in):
-                for k in range(batch_size):
+        for j in range(self.n_out):
+            for k in range(batch_size):
+                for i in range(self.n_in):
                     self.weights[j][i] -= learning_rate*delt_pre[k][j]*inputs[k][i]
+                self.bias[j] -= learning_rate*delt_pre[k][j]*self.bias[j]
         return delt_pre
 
-class BPnn():
+
+class BPnn:
     # 初始化网络，隐层和输出层权重、偏置
-    def __init__(self, d, num_hidden, hidden_cells, c):
-        # 定义隐藏层和输出层，前向传播计算出预测输出
-        self.d = d
-        self.num_hidden = num_hidden
-        self.hidden_cells = hidden_cells
-        self.c = c
-        self.layer_hidden = [Layer()for i in range(num_hidden)]
-        for i in range(self.num_hidden):
-            if i==0:
-                self.layer_hidden[i].initWeights(d,self.hidden_cells[i])
-            else:
-                self.layer_hidden[i].initWeights(self.hidden_cells[i-1],self.hidden_cells[i])
-        self.layer_out = Layer(hidden_cells[-1], c)
+    def __init__(self):
+        self.layers = []
+
+    # 添加一层，可选激活函数
+    def addLayer(self,n_in,n_out):
+        self.layers.append(Layer(n_in,n_out))
 
     # 检测网络效果
-    def test(self, testin):
-        inputs = np.array(testin)
-        for i in range(self.num_hidden):
-            h = self.layer_hidden[i].feedforward(inputs)
-            inputs = h
-        y_pred = self.layer_out.feedforward(h)
-        predicted = np.argmax(y_pred)
-        print("ouput : ", predicted)
+    def forward(self, batch_in):
+        inputs = np.array(batch_in)
+        for layer in self.layers:
+            inputs = layer.feedforward(inputs)
+        y_pre = inputs
+        return y_pre
 
     # 训练网络
-    def train(self, samples, samples_result):
-        dataset_size = np.shape(samples)[0]
+    def train(self, samples, samples_result, dataset_size):
         for step in range(steps):
             start = (step * batch_size) % dataset_size
             end = min(start + batch_size, dataset_size)
