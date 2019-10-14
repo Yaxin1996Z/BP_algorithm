@@ -1,28 +1,25 @@
 # Layer类里自动更新权重
 # 能定义隐层层数和每个隐层的单元个数
-
 import numpy as np
 from load_mnist import load_train_images,load_train_labels
+from sklearn.model_selection import train_test_split
 import os
 import pickle
 from net import BPnn,Layer
-
 
 def f(y):
     act = np.zeros((10))
     act[int(y[0])] = 1
     return act
 
+batch_size = 16
+# 设定学习率
+learning_rate = 0.001
+# 设定训练轮数
+epochs = 100
+dataset_size=60000
 
 if __name__ == '__main__':
-
-    # samples = [[-2, -1], [25, 6], [17, -4], [-15, 4]]
-    # samples_result = np.array([[0,0],[1,1],[1,0],[0,1]])
-    d, c = 28 * 28, 10
-    dataset_size = 60000
-    # samples = [[-2, -1], [25, 6], [17, 4], [-15, -6]]
-    # samples_result = np.array([[1], [0], [0], [1]])
-    # d, n_H, c = 2, 3, 1
 
     # 加载MNIST数据集
     if os.path.exists(os.path.abspath("mnist.pkl")):
@@ -41,18 +38,16 @@ if __name__ == '__main__':
         pickle.dump(samples_result, pickle_output)
         pickle_output.close()
 
-    # bp = BPnn(d, num_hidden, hidden_cells, c)
-    if os.path.exists(os.path.abspath("net.pkl")):
-        bp = BPnn.load("net.pkl")
+    X_train, X_test, Y_train, Y_test = train_test_split(samples, samples_result, test_size=0.3, random_state=0)
+
+    saveNetPath = "./net_trained/net_layer2020_bs400_initw0.1.pkl"
+    if os.path.exists(os.path.abspath(saveNetPath)):
+        bp = BPnn.load(saveNetPath)
+        print("continue train")
     else:
         bp = BPnn()
-        bp.addLayer(28*28,30)
-        bp.addLayer(30,10)
-    bp.train(samples, samples_result)
-    bp.save('./net_trained/net.pkl')
-
-    # testsamples = samples[3]
-    # bp.test(testsamples)  # 输出应该是1,0
-    # 测试样本
-    # testsamples = [[-7, -3], [20, 2]]
-    # bp.test(testsamples)  # 输出应该是1,0
+        bp.addLayer(Layer(28*28,20))
+        bp.addLayer(Layer(20,20))
+        bp.addLayer(Layer(20,10,True))
+    bp.train(X_train,Y_train,X_test,Y_test,learning_rate,batch_size,epochs)
+    bp.save(saveNetPath)
