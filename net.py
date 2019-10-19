@@ -7,21 +7,29 @@ import pickle
 def sigmoid(net):
     y = 1/(1+np.exp(-net))
     return y
-# 均方误差
-def loss_mse(y_true: np.ndarray, y_pred: np.ndarray):
-    return np.average(0.5 *((y_true-y_pred)**2).sum(axis=1))
 # sigmoid函数的导数
 def deriv_sigmoid(x):
     fx = sigmoid(x)
     return fx*(1-fx)
+
+def relu(net):
+    return np.maximum(net,0.0)
+def deriv_relu(x):
+    return 1*np.logical_and(x,1)
+
+# 均方误差
+def loss_mse(y_true: np.ndarray, y_pred: np.ndarray):
+    return np.average(0.5 *((y_true-y_pred)**2).sum(axis=1))
+
 
 class Layer:
     # 初始化神经网络层 初始化参数：输入节点数，输出节点数，权重矩阵，偏置向量
     def __init__(self, n_in, n_out, isLastLayer = False):
         self.n_in = n_in
         self.n_out = n_out
-        self.weights = np.random.uniform(-1, 1, (n_in, n_out))
-        self.bias = np.ones((n_out))
+        self.weights = np.random.uniform(-0.001, 0.001, (n_in, n_out))
+        self.bias = np.random.uniform(-0.001,0.001,n_out)
+        # self.bias = np.ones((n_out))
 
         self.pre_in, self.net, self.out = None, None, None
         self.delt = None, None
@@ -106,13 +114,15 @@ class BPnn:
                     last_delt = layer.delt
                 # print("iter train loss:%f" % ( loss_mse(y_batch, self.forward(x_batch))))
             # 学习率衰减
-            # lr *= 0.96**epo
+            lr *= 0.99**epo
             if epo%1==0 :
-                train_loss = loss_mse(Y_train, self.forward(X_train))
-                test_loss = loss_mse(Y_test, self.forward(X_test))
+                # train_loss = loss_mse(Y_train, self.forward(X_train))
+                # test_loss = loss_mse(Y_test, self.forward(X_test))
                 train_accuracy = self.cal_accuracy(X_train,Y_train)
                 test_accuracy = self.cal_accuracy(X_test, Y_test)
-                print("epoch:%d, train loss:%f, test loss:%f, train accuracy:%f, test accuracy:%f" % (epo,train_loss,test_loss,train_accuracy,test_accuracy))
+                # print("epoch:%d, train loss:%f, test loss:%f, train accuracy:%f, test accuracy:%f" % (epo,train_loss,test_loss,train_accuracy,test_accuracy))
+                print("epoch:%d,train accuracy:%f, test accuracy:%f" % (
+                epo,train_accuracy, test_accuracy))
 
     def save(self, filename):
         with open(filename, "wb") as f:
