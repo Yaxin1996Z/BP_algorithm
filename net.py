@@ -1,25 +1,99 @@
 import numpy as np
 import pickle
 
+# 定义了sigmoid、relu、和tanh三种激活函数的类
 
+def sigmoid(x):
+    return 1/(1+np.exp(-x))
 
-# sigmoid激活函数
-def sigmoid(net):
-    y = 1/(1+np.exp(-net))
-    return y
-# sigmoid函数的导数
-def deriv_sigmoid(x):
-    fx = sigmoid(x)
-    return fx*(1-fx)
+def tanh(x):
+    a = np.exp(x)
+    b = np.exp(-x)
+    return (a-b)/(a+b)
 
-def relu(net):
-    return np.maximum(net,0.0)
-def deriv_relu(x):
-    return 1*np.logical_and(x,1)
+class Sigmoid:
+    def __init__(self):
+        self.last_cal = None
+    # sigmoid激活函数
+    def cal(self, x):
+        self.last_cal = sigmoid(x)
+        return self.last_cal
+    # sigmoid函数的导数
+    def deriv(self, x=None):
+        if x:self.last_cal = sigmoid(x)
+        return self.last_cal*(1-self.last_cal)
 
-# 均方误差
-def loss_mse(y_true: np.ndarray, y_pred: np.ndarray):
-    return np.average(0.5 *((y_true-y_pred)**2).sum(axis=1))
+class Relu:
+    def __init__(self):
+        self.last_cal = None
+    def cal(self, x):
+        return np.maximum(x,0.0)
+    def deriv(self, x=None):
+        return 1*np.logical_and(x,1)
+
+class Tanh:
+    def __init__(self):
+        self.last_cal = None
+    def cal(self, x):
+        self.last_cal = tanh(x)
+        return self.last_cal
+    def deriv(self, x=None):
+        if x:self.last_cal = tanh(x)
+        return 1-self.last_cal**2
+
+# 定义softmax的计算方法
+
+def softmax(x):
+    z = x-np.max(x,axis=1,keepdims=True)
+    z_exp = np.exp(z)
+    res = z_exp/np.sum(z_exp,axis=1,keepdims=True)
+    return res
+
+class Softmax:
+    def __init__(self):
+        pass
+    def cal(self,x):
+        self.last_cal=softmax(x)
+        return self.last_cal
+    def deriv(self,x=None):
+        if x:self.last_cal=self.cal(x)
+        return self.last_cal*(1-self.last_cal)
+
+# 定义均方误差（和交叉熵）误差函数
+class MSE:
+    def __init__(self):
+        pass
+    @staticmethod
+    def cal(y_true, y_pred):
+        return np.average(0.5 *((y_true-y_pred)**2).sum(axis=1))
+    @staticmethod
+    def backward(y_true, y_pred):
+        return y_true-y_pred
+class cross_entropy:
+    def __init__(self):
+        pass
+    def cal(y_true, y_pred):
+        pass
+
+# 定义梯度更新方法(优化器类)，子类分别为不同的优化器
+# SGD等
+
+class Optimizer:
+    def __init__(self,lr=0.001, decay=1, lr_min=0.00001, lr_max=1):
+        self.lr = lr
+        self.decay = decay
+        self.lr_min = lr_min
+        self.lr_max = lr_max
+        self.iter = 0
+    def update(self):
+        self.iter += 1
+        self.lr *= self.decay**(self.iter/1000)
+        np.clip(self.lr, self.lr_min, self.lr_max)
+class SGD(Optimizer):
+    def __init__(self):
+        Optimizer.__init__(self)
+    def update(self):
+        pass
 
 
 class Layer:
