@@ -1,6 +1,7 @@
+# coding utf8
 import numpy as np
 import pickle
-
+import matplotlib.pyplot as plt
 # 定义了sigmoid、relu、和tanh三种激活函数的类
 
 def sigmoid(x):
@@ -27,9 +28,11 @@ class Relu:
     def __init__(self):
         self.last_cal = None
     def cal(self, x):
-        return np.maximum(x,0.0)
+        self.last_cal=np.maximum(x,0.0)
+        return self.last_cal
     def deriv(self, x=None):
-        return 1*np.logical_and(x,1)
+        if x:self.last_cal=self.cal(x)
+        return 1.*np.logical_and(self.last_cal,1)
 
 class Tanh:
     def __init__(self):
@@ -68,7 +71,7 @@ class MSE:
         return np.average(0.5 *((y_true-y_pred)**2).sum(axis=1))
     @staticmethod
     def backward(y_true, y_pred):
-        return y_true-y_pred
+        return y_pred-y_true
 class cross_entropy:
     def __init__(self):
         pass
@@ -86,50 +89,63 @@ class Optimizer:
         self.lr_max = lr_max
         self.iter = 0
     def update(self):
+        # 学习率衰减
         self.iter += 1
-        self.lr *= self.decay**(self.iter/1000)
-        np.clip(self.lr, self.lr_min, self.lr_max)
+        # self.lr *= self.decay**(self.iter/1000)
+        # np.clip(self.lr, self.lr_min, self.lr_max)
 class SGD(Optimizer):
     def __init__(self):
         Optimizer.__init__(self)
-    def update(self):
-        pass
+    def update(self, w, b, g_w, g_b):
+        w -= self.lr*g_w
+        b -= self.lr*g_b
+        super(SGD, self).update()
+        return w, b
 
+def draw_result(iter, train_loss, test_accuracy, title):
+    plt.plot(iter, train_loss, '-', label = 'train_loss')
+    # plt.plot(iter, test_loss, '-.', label = 'test_loss')
+    # plt.plot(iter, train_accuracy, '-', label = 'train_accuracy')
+    plt.plot(iter, test_accuracy, '-.', label = 'test_accuracy')
+    plt.xlabel('n epochs')
+    plt.legend(loc = 'upper right')
+    plt.title(title)
+
+    plt.show()
 
 class Layer:
     # 初始化神经网络层 初始化参数：输入节点数，输出节点数，权重矩阵，偏置向量
-    def __init__(self, n_in, n_out, isLastLayer = False):
+    def __init__(self, n_in, n_out, activation = Sigmoid):
         self.n_in = n_in
         self.n_out = n_out
-        self.weights = np.random.uniform(-0.001, 0.001, (n_in, n_out))
-        self.bias = np.random.uniform(-0.001,0.001,n_out)
+        self.ac_fn = activation()
+        self.weights = np.random.uniform(-0.0001, 0.0001, (n_in, n_out))
+        self.bias = np.random.uniform(-0.0001,0.0001,n_out)
         # self.bias = np.ones((n_out))
-
-        self.pre_in, self.net, self.out = None, None, None
-        self.delt = None, None
-        self.isLastLayer = isLastLayer
+        self.inputs = None
+        self.g_w,self.g_b = None, None
 
     # 该层前向传播 得到总输出向量
     def feedforward(self, inputs):
+        self.inputs = inputs
         net = np.dot(inputs, self.weights) + self.bias  # inputs和weight一个行向量一个列向量
-        outputs = sigmoid(net)
-        return net, outputs
+        outputs = self.ac_fn.cal(net)
+        return outputs
 
     # 该层反向更新 last_delt为后一层的delt假设p个元素，w为后面一层的
-    def backward(self,lr, last_delt=None, last_w=None):
-        self.delt = last_delt
-        if self.isLastLayer:
-            self.delt = last_delt * deriv_sigmoid(self.net)
-        else:
-            self.delt = np.dot(last_delt,last_w.T)*deriv_sigmoid(self.net)
-        self.weights -= lr*((self.pre_in[:,:,np.newaxis]*self.delt[:,np.newaxis]).sum(axis=0))
-        self.bias -= lr*(self.delt.sum(axis=0))
+    def backward(self, pre_grad=None):
+        delte = pre_grad * self.ac_fn.deriv()
+        self.g_w = np.dot(self.inputs.T, delte)
+        self.g_b = delte.sum(axis=0)
+        next_grad = np.dot(delte, self.weights.T)
+        return next_grad
 
 class BPnn:
     # 初始化网络，隐层和输出层权重、偏置
-    def __init__(self):
+    def __init__(self, cost=MSE, optimizer=SGD):
         self.layers = []
-
+        self.cost = cost()
+        self.optimizer = optimizer()
     # 添加一层
     def addLayer(self, layer):
         self.layers.append(layer)
@@ -138,7 +154,7 @@ class BPnn:
     def forward(self, batch_in):
         inputs = batch_in
         for layer in self.layers:
-            _, inputs = layer.feedforward(inputs)
+            inputs = layer.feedforward(inputs)
         y_pre = inputs
         return y_pre
 
@@ -146,57 +162,47 @@ class BPnn:
     def testdemo(self, batch_in):
         inputs = batch_in
         for layer in self.layers:
-            _, inputs = layer.feedforward(inputs)
+            inputs = layer.feedforward(inputs)
         y_pre = inputs
         print(np.argmax(y_pre))
 
     def cal_accuracy(self, X_data, Y_data):
-        y_pred = self.forward(X_data)
-        count = 0
-        total = len(Y_data)
-        for i in range(total):
-            if np.argmax(y_pred[i]) == np.argmax(Y_data[i]):
-                count += 1
-        return count / total
+        Y_pred = self.forward(X_data)
+        rets = [(np.argmax(y_), np.argmax(y_true))for y_,y_true in zip(Y_pred,Y_data)]
+        count = sum(t==y for t,y in rets)
+        return  count/len(X_data)
         # 训练网络
-    def train(self, X_train, Y_train, X_test, Y_test, lr=0.01, batch_size=16, epochs=100):
+    def train(self, X_train, Y_train, X_test, Y_test, learning_rate, batch_size=16, epochs=100):
+        self.optimizer.lr = learning_rate
         dataset_size = len(X_train)
-        print("init train loss:%f" % (loss_mse(Y_train, self.forward(X_train))))
+        print("init train loss:%f" % (self.cost.cal(Y_train, self.forward(X_train))))
+        train_loss, test_accuracy = [], []
         for epo in range(epochs):
 
             for t in range(0,dataset_size,batch_size):
                 x_batch = X_train[t:t+batch_size]
                 y_batch = Y_train[t:t+batch_size]  # bs*c
+                # y_pred = x_batch
+                # for layer in self.layers:
+                #     y_pred = layer.feedforward(y_pred)
 
-                bat_in =x_batch
-                # 前向传播算出每层净输出和输出
-                for layer in self.layers:
-                    layer.pre_in = bat_in
-                    layer.net, layer.out = layer.feedforward(layer.pre_in)
-                    bat_in = layer.out
+                pre_grad = self.cost.backward(y_batch,self.forward(x_batch))
+                for layer in self.layers[::-1]:
+                    pre_grad = layer.backward(pre_grad)
 
                #  反向传播更新权重和偏置
-                last_delt = self.layers[-1].out-y_batch
-                last_w = None
+                for layer in self.layers:
+                    layer.weights,layer.bias = self.optimizer.update(layer.weights, layer.bias, layer.g_w, layer.g_b)
 
-                for layer in self.layers[::-1]:
-                    if layer.isLastLayer:
-                        layer.backward(lr,last_delt)
-                    else:
-                        layer.backward(lr,last_delt,last_w)
-                    last_w = layer.weights
-                    last_delt = layer.delt
-                # print("iter train loss:%f" % ( loss_mse(y_batch, self.forward(x_batch))))
             # 学习率衰减
-            lr *= 0.99**epo
             if epo%1==0 :
-                # train_loss = loss_mse(Y_train, self.forward(X_train))
-                # test_loss = loss_mse(Y_test, self.forward(X_test))
-                train_accuracy = self.cal_accuracy(X_train,Y_train)
-                test_accuracy = self.cal_accuracy(X_test, Y_test)
-                # print("epoch:%d, train loss:%f, test loss:%f, train accuracy:%f, test accuracy:%f" % (epo,train_loss,test_loss,train_accuracy,test_accuracy))
-                print("epoch:%d,train accuracy:%f, test accuracy:%f" % (
-                epo,train_accuracy, test_accuracy))
+                loss = self.cost.cal(Y_train, self.forward(X_train))
+                acc = self.cal_accuracy(X_test,Y_test)
+                train_loss.append(loss)
+                test_accuracy.append(acc)
+                print("epoch:%d, train loss:%f,test accuracy:%f" % (epo,loss, acc))
+                # print("epoch:%d,train accuracy:%f, test accuracy:%f" % (epo, acc_train, acc_test))
+        draw_result(range(epochs),train_loss,test_accuracy,'training curve')
 
     def save(self, filename):
         with open(filename, "wb") as f:

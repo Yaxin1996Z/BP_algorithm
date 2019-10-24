@@ -10,7 +10,7 @@ def loss_mse(y_true: np.ndarray, y_pred: np.ndarray):
 
 if __name__ == '__main__':
 
-    bp = BPnn.load("./net_trained/net_layer50_bs100_initw0.2.pkl")
+    bp = BPnn.load("./net_trained/net_layer100_bs400_lr0.0001_initw0.2.pkl")
 
     pkl_file = open('mnist.pkl', 'rb')
     samples = pickle.load(pkl_file)
